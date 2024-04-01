@@ -139,6 +139,8 @@ class MapEditor:
         self.draw_tools_on_tiles_canvas(4, 4, 32, 32)
         self.draw_empty_grid_on_map_canvas(32, 32, 32, 32)
 
+    # HANDLE SPRITE SHEET FILE
+
     def choose_file(self):
         file_path = filedialog.askopenfilename()
         self.selected_tiles_file_path = file_path
@@ -153,6 +155,22 @@ class MapEditor:
             if n1 % k1 != 0:
                 self.tools_rows_count += 1
             self.tiles_canvas.config(scrollregion=(0, 0, 148, self.tools_rows_count * 32))
+
+    def split_image(self):
+        tile_w = int(self.tile_size_width_input.get())
+        tile_h = int(self.tile_size_height_input.get())
+        scaled_tile_size = 32
+        images = []
+        for y in range(0, self.sprite_img.height, tile_h):
+            for x in range(0, self.sprite_img.width, tile_w):
+                tile = self.sprite_img.crop((x, y, x + tile_w, y + tile_h))
+                tile.thumbnail((scaled_tile_size, scaled_tile_size))
+                if tile.size[0] < scaled_tile_size or tile.size[1] < scaled_tile_size:
+                    tile = tile.resize((scaled_tile_size, scaled_tile_size))
+                images.append(tile)
+        return images
+
+    # HANDLE MOUSE MOVES AND CLICKS
 
     def on_mouse_drag(self, event):
         if self.is_mouse_pressed:
@@ -204,20 +222,6 @@ class MapEditor:
                 center_y = (y1 + y2) / 2
                 self.map_grid_canvas.create_text(center_x, center_y, text=str(self.current_tool), fill="white")
 
-    def split_image(self):
-        tile_w = int(self.tile_size_width_input.get())
-        tile_h = int(self.tile_size_height_input.get())
-        scaled_tile_size = 32
-        images = []
-        for y in range(0, self.sprite_img.height, tile_h):
-            for x in range(0, self.sprite_img.width, tile_w):
-                tile = self.sprite_img.crop((x, y, x + tile_w, y + tile_h))
-                tile.thumbnail((scaled_tile_size, scaled_tile_size))
-                if tile.size[0] < scaled_tile_size or tile.size[1] < scaled_tile_size:
-                    tile = tile.resize((scaled_tile_size, scaled_tile_size))
-                images.append(tile)
-        return images
-
     def on_tool_click(self, event):
         x_offset = int(self.tiles_canvas.canvasx(0))
         y_offset = int(self.tiles_canvas.canvasy(0))
@@ -227,15 +231,6 @@ class MapEditor:
         index = col_index + row_index * cols + 1
         self.current_tool = index
         self.draw_tools_on_tiles_canvas(4, self.tools_rows_count, 32, 32)
-
-    def draw_images_on_tiles_canvas(self):
-        self.images_for_tools = []
-        for i, img in enumerate(self.tiles_images):
-            row = i // 4
-            col = i % 4
-            photo = ImageTk.PhotoImage(self.tiles_images[i])
-            self.images_for_tools.append(photo)
-            self.tiles_canvas.create_image(col * 32, row * 32, anchor=tk.NW, image=photo)
 
     def draw_tools_on_tiles_canvas(self, cols, rows, tile_width, tile_height):
         self.tiles_canvas.delete("all")
@@ -281,6 +276,8 @@ class MapEditor:
         self.tiles_canvas.create_text(center_x, center_y + 1, text=text, fill="white", font=("Helvetica", 12, "bold"))
         # text
         self.tiles_canvas.create_text(center_x, center_y, text=text, fill=color, font=("Helvetica", 12, "bold"))
+
+    # HANDLE BUTTONS CLICKS
 
     def on_accept_settings_button_click(self):
         cols = int(self.grid_size_cols_input.get())
@@ -331,6 +328,19 @@ class MapEditor:
                 grid_string += str(self.grid_state[row][col]).zfill(4)
         self.textarea.delete(1.0, tk.END)
         self.textarea.insert(tk.END, grid_string)
+
+    # TOOL SELECTION VIEW
+
+    def draw_images_on_tiles_canvas(self):
+        self.images_for_tools = []
+        for i, img in enumerate(self.tiles_images):
+            row = i // 4
+            col = i % 4
+            photo = ImageTk.PhotoImage(self.tiles_images[i])
+            self.images_for_tools.append(photo)
+            self.tiles_canvas.create_image(col * 32, row * 32, anchor=tk.NW, image=photo)
+
+    # MAP DESIGN VIEW
 
     def draw_empty_grid_on_map_canvas(self, cols, rows, tile_width, tile_height):
         self.map_grid_canvas.delete("all")
