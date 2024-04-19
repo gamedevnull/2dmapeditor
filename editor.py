@@ -7,6 +7,7 @@ class MapEditor:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("2D Games Map Editor")
+        self.root.geometry("1150x800")
 
         # inputs defaults
         self.default_cols = tk.StringVar(value="32")
@@ -39,6 +40,11 @@ class MapEditor:
 
         # for drawing tiles while holding the mouse button down
         self.is_mouse_pressed = False
+
+        map_canvas_height = 700
+        map_canvas_width = 860
+        tools_canvas_height = 386
+        tools_canvas_width = 148
 
         # SPRITES CONFIG
 
@@ -89,7 +95,7 @@ class MapEditor:
         ok_button = ttk.Button(self.box_2_frame, text="OK", command=self.on_accept_settings_button_click, width=3)
         ok_button.grid(row=0, column=4, padx=(5, 5), pady=(5, 5))
 
-        self.map_grid_canvas = tk.Canvas(self.box_2, width=800, height=600, scrollregion=(0, 0, 1200, 1200))
+        self.map_grid_canvas = tk.Canvas(self.box_2, width=map_canvas_width, height=map_canvas_height, scrollregion=(0, 0, 1200, 1200))
         self.map_grid_canvas.grid(row=1, column=0, padx=(5, 5), pady=(5, 5), sticky="nw")
 
         self.v_scroll1 = ttk.Scrollbar(self.box_2, orient="vertical", command=self.map_grid_canvas.yview)
@@ -104,7 +110,7 @@ class MapEditor:
         self.box_3 = ttk.Frame(self.box_1_frame)
         self.box_3.grid(row=3, column=0, columnspan=4, padx=(5, 5), pady=(5, 5), sticky="nw")
 
-        self.tiles_canvas = tk.Canvas(self.box_3, width=148, height=680,
+        self.tiles_canvas = tk.Canvas(self.box_3, width=tools_canvas_width, height=tools_canvas_height,
                                       scrollregion=(0, 0, 148, self.tools_height))
         self.tiles_canvas.grid(row=0, column=0, padx=(5, 5), pady=(5, 5), sticky="nw")
 
@@ -115,11 +121,11 @@ class MapEditor:
 
         # MAP HASH
 
-        self.box_4_frame_2 = tk.LabelFrame(self.box_2, text="Hash")
-        self.box_4_frame_2.grid(row=4, column=0, sticky="nw")
+        self.box_4_frame_2 = tk.LabelFrame(self.box_1, text="Hash")
+        self.box_4_frame_2.grid(row=1, column=0, sticky="nw", padx=(5, 5))
 
-        self.textarea = tk.Text(self.box_4_frame_2, width=60, height=3)
-        self.textarea.grid(row=0, column=0, columnspan=6, padx=5, pady=5, sticky="nwse")
+        self.textarea = tk.Text(self.box_4_frame_2, width=13, height=8)
+        self.textarea.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="nwse")
 
         get_map_button = ttk.Button(self.box_4_frame_2, text="Save", command=self.on_get_map_button_click)
         get_map_button.grid(row=1, column=0, padx=(5, 5), pady=5, sticky="nw")
