@@ -1,4 +1,5 @@
 import tkinter as tk
+import random
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk
 
@@ -95,7 +96,11 @@ class MapEditor:
         ok_button = ttk.Button(self.box_2_frame, text="OK", command=self.on_accept_settings_button_click, width=3)
         ok_button.grid(row=0, column=4, padx=(5, 5), pady=(5, 5))
 
-        self.map_grid_canvas = tk.Canvas(self.box_2, width=map_canvas_width, height=map_canvas_height, scrollregion=(0, 0, 1200, 1200))
+        generate_button = ttk.Button(self.box_2_frame, text="Generate", command=self.on_generate_button_click, width=7)
+        generate_button.grid(row=0, column=5, padx=(5, 5), pady=(5, 5))
+
+        self.map_grid_canvas = tk.Canvas(self.box_2, width=map_canvas_width, height=map_canvas_height,
+                                         scrollregion=(0, 0, 1200, 1200))
         self.map_grid_canvas.grid(row=1, column=0, padx=(5, 5), pady=(5, 5), sticky="nw")
 
         self.v_scroll1 = ttk.Scrollbar(self.box_2, orient="vertical", command=self.map_grid_canvas.yview)
@@ -291,6 +296,59 @@ class MapEditor:
         tile_w = 32  # int(self.tile_size_width_input.get())
         tile_h = 32  # int(self.tile_size_height_input.get())
         self.draw_empty_grid_on_map_canvas(cols, rows, 32, 32)
+        self.map_grid_canvas.config(scrollregion=(0, 0, cols * tile_w, rows * tile_h))
+
+    @staticmethod
+    def generate_maze(width, height):
+        maze = [[1] * width for _ in range(height)]
+
+        def create_path(x, y):
+            directions = [(x, y - 2), (x + 2, y), (x, y + 2), (x - 2, y)]
+            random.shuffle(directions)
+            for new_x, new_y in directions:
+                if 0 <= new_x < width and 0 <= new_y < height and maze[new_y][new_x] == 1:
+                    maze[new_y][new_x] = 0
+                    maze[new_y - (new_y - y) // 2][new_x - (new_x - x) // 2] = 0
+                    create_path(new_x, new_y)
+
+        create_path(1, 1)
+
+        return maze
+
+    def on_generate_button_click(self):
+
+        cols = int(self.grid_size_cols_input.get())
+        rows = int(self.grid_size_rows_input.get())
+
+        self.grid_state = [[0] * cols for _ in range(rows)]
+
+        self.grid_state = self.generate_maze(cols, cols)
+
+        tile_w = 32  # int(self.tile_size_width_input.get())
+        tile_h = 32  # int(self.tile_size_height_input.get())
+
+        self.map_grid_canvas.delete("all")
+
+        for row in range(rows):
+            for col in range(cols):
+                x1 = col * tile_w
+                y1 = row * tile_h
+                x2 = x1 + tile_w
+                y2 = y1 + tile_h
+                if self.grid_state[row][col] == 1:
+
+                    if self.tiles_images and self.current_tool < len(self.tiles_images):
+                        photo = ImageTk.PhotoImage(self.tiles_images[self.current_tool - 1])
+                        self.grid_images_for_map_grid.append(photo)
+                        self.map_grid_canvas.create_image(x1, y1, anchor=tk.NW, image=photo)
+                    else:
+                        self.map_grid_canvas.create_rectangle(x1, y1, x2, y2, fill="black")
+                        center_x = (x1 + x2) / 2
+                        center_y = (y1 + y2) / 2
+                        self.map_grid_canvas.create_text(center_x, center_y, text=str(1), fill="white")
+                else:
+                    self.map_grid_canvas.create_rectangle(x1, y1, x2, y2, outline="gray", fill="white", width=1)
+
         self.map_grid_canvas.config(scrollregion=(0, 0, cols * tile_w, rows * tile_h))
 
     def on_accept_tile_settings_button_click(self):
