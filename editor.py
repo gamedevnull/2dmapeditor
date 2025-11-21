@@ -17,7 +17,9 @@ class MapEditor:
         self.default_tile_height = tk.StringVar(value="32")
 
         # 2d array for the map design
-        self.grid_state = []
+        self.grid_state = {}
+        self.active_layer_index = 0
+        self.grid_state[self.active_layer_index] = []
 
         # selected tile for drawing
         self.current_tool = 1
@@ -42,7 +44,7 @@ class MapEditor:
         # for drawing tiles while holding the mouse button down
         self.is_mouse_pressed = False
 
-        map_canvas_height = 700
+        map_canvas_height = 660
         map_canvas_width = 860
         tools_canvas_height = 386
         tools_canvas_width = 148
@@ -99,8 +101,33 @@ class MapEditor:
         generate_button = ttk.Button(self.box_2_frame, text="Generate", command=self.on_generate_button_click, width=7)
         generate_button.grid(row=0, column=5, padx=(5, 5), pady=(5, 5))
 
+        # LAYERS SELECTION
+
+        layer_label = ttk.Label(self.box_2_frame, text="Layers")
+        layer_label.grid(row=0, column=6, padx=(10, 2), pady=(5, 5))
+
+        self.layer_buttons = []
+        self.layer_checkboxes = []
+        self.layer_checkbox_vars = []
+        for i in range(5):
+            if i == self.active_layer_index:
+                btn_text = f"[{i+1}]"
+            else:
+                btn_text = str(i+1)
+            btn = ttk.Button(self.box_2_frame, text=btn_text, width=2, command=lambda idx=i: self.set_active_layer(idx))
+            btn.grid(row=0, column=7+i*2, padx=(2, 2), pady=(5, 5))
+            self.layer_buttons.append(btn)
+
+            var = tk.BooleanVar()
+            if i == self.active_layer_index:
+                var.set(True)
+            chk = ttk.Checkbutton(self.box_2_frame, variable=var, command=lambda idx=i: self.on_layer_checkbox(idx))
+            chk.grid(row=0, column=8+i*2, padx=(2, 2), pady=(5, 5))
+            self.layer_checkboxes.append(chk)
+            self.layer_checkbox_vars.append(var)
+
         self.map_grid_canvas = tk.Canvas(self.box_2, width=map_canvas_width, height=map_canvas_height,
-                                         scrollregion=(0, 0, 1200, 1200))
+                                         scrollregion=(0, 0, 900, 900))
         self.map_grid_canvas.grid(row=1, column=0, padx=(5, 5), pady=(5, 5), sticky="nw")
 
         self.v_scroll1 = ttk.Scrollbar(self.box_2, orient="vertical", command=self.map_grid_canvas.yview)
@@ -108,6 +135,7 @@ class MapEditor:
 
         self.h_scroll1 = ttk.Scrollbar(self.box_2, orient="horizontal", command=self.map_grid_canvas.xview)
         self.h_scroll1.grid(row=2, column=0, columnspan=2, padx=(5, 5), pady=(5, 5), sticky="nwes")
+
         self.map_grid_canvas.config(xscrollcommand=self.h_scroll1.set, yscrollcommand=self.v_scroll1.set)
 
         # TOOL SELECTOR
@@ -189,7 +217,10 @@ class MapEditor:
             y_offset = int(self.map_grid_canvas.canvasy(0))
             col = (event.x + x_offset) // 32
             row = (event.y + y_offset) // 32
-            self.grid_state[row][col] = self.current_tool
+            grid = self.grid_state[self.active_layer_index]
+            if row >= len(grid) or col >= len(grid[0]):
+                return
+            self.set_grid_state_val(row, col, self.current_tool)
             x1 = col * 32
             y1 = row * 32
             x2 = x1 + 32
@@ -214,15 +245,18 @@ class MapEditor:
         y_offset = int(self.map_grid_canvas.canvasy(0))
         col = (event.x + x_offset) // 32
         row = (event.y + y_offset) // 32
+        grid = self.grid_state[self.active_layer_index]
+        if row >= len(grid) or col >= len(grid[0]):
+            return
         x1 = col * 32
         y1 = row * 32
         x2 = x1 + 32
         y2 = y1 + 32
-        if self.grid_state[row][col] != 0:
-            self.grid_state[row][col] = 0
+        if self.get_grid_state_val(row, col) != 0:
+            self.set_grid_state_val(row, col, 0)
             self.map_grid_canvas.create_rectangle(x1, y1, x2, y2, fill="white", outline="gray", width=1)
         else:
-            self.grid_state[row][col] = self.current_tool
+            self.set_grid_state_val(row, col, self.current_tool)
             if self.tiles_images and self.current_tool < len(self.tiles_images):
                 photo = ImageTk.PhotoImage(self.tiles_images[self.current_tool - 1])
                 self.grid_images_for_map_grid.append(photo)
@@ -302,27 +336,46 @@ class MapEditor:
     def generate_maze(width, height):
         maze = [[1] * width for _ in range(height)]
 
-        def create_path(x, y):
-            directions = [(x, y - 2), (x + 2, y), (x, y + 2), (x - 2, y)]
-            random.shuffle(directions)
-            for new_x, new_y in directions:
-                if 0 <= new_x < width and 0 <= new_y < height and maze[new_y][new_x] == 1:
-                    maze[new_y][new_x] = 0
-                    maze[new_y - (new_y - y) // 2][new_x - (new_x - x) // 2] = 0
-                    create_path(new_x, new_y)
+        if width > 32 or height > 32:
+            stack = [(1, 1)]
+            maze[1][1] = 0
 
-        create_path(1, 1)
+            while stack:
+                x, y = stack[-1]
+                directions = [(x, y - 2), (x + 2, y), (x, y + 2), (x - 2, y)]
+                random.shuffle(directions)
+                moved = False
+                for new_x, new_y in directions:
+                    if 0 <= new_x < width and 0 <= new_y < height and maze[new_y][new_x] == 1:
+                        maze[new_y][new_x] = 0
+                        maze[y + (new_y - y) // 2][x + (new_x - x) // 2] = 0
+                        stack.append((new_x, new_y))
+                        moved = True
+                        break
+                if not moved:
+                    stack.pop()
+            return maze
 
-        return maze
+        else:
+
+            def create_path(x, y):
+                directions = [(x, y - 2), (x + 2, y), (x, y + 2), (x - 2, y)]
+                random.shuffle(directions)
+                for new_x, new_y in directions:
+                    if 0 <= new_x < width and 0 <= new_y < height and maze[new_y][new_x] == 1:
+                        maze[new_y][new_x] = 0
+                        maze[new_y - (new_y - y) // 2][new_x - (new_x - x) // 2] = 0
+                        create_path(new_x, new_y)
+            create_path(1, 1)
+            return maze
 
     def on_generate_button_click(self):
 
         cols = int(self.grid_size_cols_input.get())
         rows = int(self.grid_size_rows_input.get())
 
-        self.grid_state = [[0] * cols for _ in range(rows)]
-
-        self.grid_state = self.generate_maze(cols, cols)
+        self.reset_grid_state(cols, rows)
+        self.set_grid_values(self.generate_maze(cols, cols))
 
         tile_w = 32  # int(self.tile_size_width_input.get())
         tile_h = 32  # int(self.tile_size_height_input.get())
@@ -335,7 +388,7 @@ class MapEditor:
                 y1 = row * tile_h
                 x2 = x1 + tile_w
                 y2 = y1 + tile_h
-                if self.grid_state[row][col] == 1:
+                if self.get_grid_state_val(row, col) == 1:
 
                     if self.tiles_images and self.current_tool < len(self.tiles_images):
                         photo = ImageTk.PhotoImage(self.tiles_images[self.current_tool - 1])
@@ -358,21 +411,44 @@ class MapEditor:
     def on_set_map_button_click(self):
         cols = int(self.grid_size_cols_input.get())
         rows = int(self.grid_size_rows_input.get())
-        self.grid_state = [[0] * cols for _ in range(rows)]
+        self.reset_grid_state(cols, rows)
         grid_string = self.textarea.get("1.0", tk.END).strip()
         index = 0
         self.draw_empty_grid_on_map_canvas(cols, rows, 32, 32)
         for row in range(rows):
             for col in range(cols):
                 cell_value = int(grid_string[index:index + 4])
-                self.grid_state[row][col] = cell_value
+                self.set_grid_state_val(row, col, cell_value)
                 index += 4
                 x1 = col * 32
                 y1 = row * 32
                 x2 = x1 + 32
                 y2 = y1 + 32
-                if self.grid_state[row][col] != 0:
-                    self.current_tool = self.grid_state[row][col]
+                if self.get_grid_state_val(row, col) != 0:
+                    self.current_tool = self.get_grid_state_val(row, col)
+                    if self.tiles_images and self.current_tool < len(self.tiles_images):
+                        photo = ImageTk.PhotoImage(self.tiles_images[self.current_tool - 1])
+                        self.grid_images_for_map_grid.append(photo)
+                        self.map_grid_canvas.create_image(x1, y1, anchor=tk.NW, image=photo)
+                    else:
+                        self.map_grid_canvas.create_rectangle(x1, y1, x2, y2, fill="black")
+                        center_x = (x1 + x2) / 2
+                        center_y = (y1 + y2) / 2
+                        self.map_grid_canvas.create_text(center_x, center_y, text=str(self.current_tool), fill="white")
+
+    def draw_map_from_grid_state(self, idx):
+        cols = int(self.grid_size_cols_input.get())
+        rows = int(self.grid_size_rows_input.get())
+
+        for row in range(rows):
+            for col in range(cols):
+
+                x1 = col * 32
+                y1 = row * 32
+                x2 = x1 + 32
+                y2 = y1 + 32
+                if self.get_grid_state_val(row, col, True, idx) != 0:
+                    self.current_tool = self.get_grid_state_val(row, col, True, idx)
                     if self.tiles_images and self.current_tool < len(self.tiles_images):
                         photo = ImageTk.PhotoImage(self.tiles_images[self.current_tool - 1])
                         self.grid_images_for_map_grid.append(photo)
@@ -389,7 +465,7 @@ class MapEditor:
         rows = int(self.grid_size_rows_input.get())
         for row in range(rows):
             for col in range(cols):
-                grid_string += str(self.grid_state[row][col]).zfill(4)
+                grid_string += str(self.get_grid_state_val(row, col)).zfill(4)
         self.textarea.delete(1.0, tk.END)
         self.textarea.insert(tk.END, grid_string)
 
@@ -406,9 +482,10 @@ class MapEditor:
 
     # MAP DESIGN VIEW
 
-    def draw_empty_grid_on_map_canvas(self, cols, rows, tile_width, tile_height):
+    def draw_empty_grid_on_map_canvas(self, cols, rows, tile_width, tile_height, reset_state=True):
         self.map_grid_canvas.delete("all")
-        self.grid_state = [[0] * cols for _ in range(rows)]
+        if reset_state:
+            self.reset_grid_state(cols, rows)
         for row in range(rows):
             for col in range(cols):
                 x1 = col * tile_width
@@ -419,6 +496,57 @@ class MapEditor:
 
     def run(self):
         self.root.mainloop()
+
+    # --- GRID STATE UTILS ---
+
+    def set_grid_state_val(self, row, col, val):
+        self.grid_state[self.active_layer_index][row][col] = val
+
+    def get_grid_state_val(self, row, col, us_idx = False, idx = None):
+        if us_idx and idx >= 0:
+            return self.grid_state[idx][row][col]
+        return self.grid_state[self.active_layer_index][row][col]
+
+    def reset_grid_state(self, cols, rows):
+        self.grid_state[self.active_layer_index] = [[0] * cols for _ in range(rows)]
+
+    def set_grid_values(self, grid):
+        self.grid_state[self.active_layer_index] = grid
+
+
+    def set_active_layer(self, idx):
+
+        self.active_layer_index = idx
+        self.layer_checkbox_vars[idx].set(True)
+
+        for i, btn in enumerate(self.layer_buttons):
+            if i == self.active_layer_index:
+                btn.config(text=f"[{i + 1}]")
+            else:
+                btn.config(text=str(i + 1))
+
+        if idx not in self.grid_state:
+            cols = int(self.grid_size_cols_input.get())
+            rows = int(self.grid_size_rows_input.get())
+            self.grid_state[idx] = [[0] * cols for _ in range(rows)]
+
+        for i in range(5):
+            if self.layer_checkbox_vars[i].get() and i in self.grid_state:
+                self.draw_map_from_grid_state(i)
+
+        self.on_get_map_button_click()
+
+
+    def on_layer_checkbox(self, idx):
+
+        cols = int(self.grid_size_cols_input.get())
+        rows = int(self.grid_size_rows_input.get())
+
+        self.draw_empty_grid_on_map_canvas(cols, rows, 32, 32, False)
+
+        for i in range(5):
+            if self.layer_checkbox_vars[i].get() and i in self.grid_state:
+                self.draw_map_from_grid_state(i)
 
 
 if __name__ == "__main__":
